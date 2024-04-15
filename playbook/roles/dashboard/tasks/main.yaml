@@ -1,0 +1,34 @@
+---
+- name: Get {{ ansible_user }} Home Directory
+  register: home_directory
+  shell:
+    cmd: "getent passwd {{ ansible_user }}  | awk -F: '{ print $6 }'"
+
+- name: Deploy Kubernetes Dashboard UI
+  ansible.builtin.command: kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.7.0/aio/deploy/recommended.yaml
+
+- name: Installation of nginx Ingress Controller
+  ansible.builtin.command: kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.1.1/deploy/static/provider/baremetal/deploy.yaml
+
+- name: Configure nginx Ingress Controller as the default one
+  ansible.builtin.command: kubectl annotate ingressclass nginx ingressclass.kubernetes.io/is-default-class=true
+
+- name: Pause for 1 minute
+  ansible.builtin.pause:
+    minutes: 1
+
+- name: Copy Dashboard spec file
+  ansible.builtin.template:
+    src: "user.j2"
+    dest: "{{ home_directory.stdout }}/dashboard.yaml"
+
+- name: Create Dashboard User and Secret
+  ansible.builtin.command:
+    cmd: "kubectl apply -f {{ home_directory.stdout }}/dashboard.yaml"
+
+- name: Clean up spec File
+  file:
+    path: "{{ home_directory.stdout }}/dashboard.yaml"
+    state: absent
+
+
